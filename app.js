@@ -23,9 +23,11 @@ app.get('/', (req, res) => {
 });
 
 // TODO: Add routes for user registration, login, group management, etc.
-
+require('dotenv').config();
 app.listen(3000, () => {
     console.log('YSpotyAPI is running on port 3000');
+    console.log(process.env.SPOTIFY_CLIENT_ID);
+    console.log(process.env.SPOTIFY_CLIENT_SECRET);
 });
 
 // User registration
