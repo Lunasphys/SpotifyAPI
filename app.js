@@ -7,9 +7,15 @@ const bcrypt = require('bcrypt');
 const session = require('express-session');
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger');
-mongoose.connect('mongodb://localhost:27017/SpotyAPI', { useNewUrlParser: true, useUnifiedTopology: true });
-
+const SpotifyWebApi = require('spotify-web-api-node');
 const app = express();
+const spotifyApi = new SpotifyWebApi({
+    clientId: process.env.SPOTIFY_CLIENT_ID,
+    clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+    redirectUri: 'http://localhost:3000/auth/spotify/callback'
+});
+
+mongoose.connect('mongodb://localhost:27017/SpotyAPI', { useNewUrlParser: true, useUnifiedTopology: true });
 
 app.use(session({
     secret: 'secret',
@@ -57,11 +63,6 @@ router.post('/register', async (req, res) => {
 });
 
 app.use(router);
-
-app.use(function(req, res, next) {
-    res.setHeader("Content-Security-Policy", "default-src 'none'; font-src 'self' http://localhost:3000; style-src 'self' http://fonts.googleapis.com;");
-    return next();
-});
 
 app.get('/auth/spotify', passport.authenticate('spotify', {
     scope: ['user-read-email', 'user-read-private'],
@@ -257,3 +258,4 @@ router.post('/leaveGroup', async (req, res) => {
 
     res.send('User left the group successfully');
 });
+
