@@ -205,7 +205,7 @@ router.post('/joinGroup', async (req, res) => {
     res.send('User joined the group successfully');
 });
 
-// Consult group
+// CONSULT GROUPS
 // Fetch all groups
 router.get('/groups', async (req, res) => {
     const groups = await Group.find().populate('users', 'username');
@@ -231,4 +231,29 @@ router.get('/groupUsers/:groupId', async (req, res) => {
         activeDeviceName: user.profile ? user.profile.activeDeviceName : null
     }));
     res.json(usersInfo);
+});
+
+// Leaving group
+router.post('/leaveGroup', async (req, res) => {
+    const currentUser = req.user;
+
+    if (!currentUser.group) {
+        return res.status(400).send('User is not in a group');
+    }
+
+    const group = await Group.findById(currentUser.group);
+    group.users.pull(currentUser._id);
+    if (group.chief.equals(currentUser._id)) {
+        if (group.users.length > 0) {
+            group.chief = group.users[0];
+        } else {
+            await Group.findByIdAndDelete(group._id);
+        }
+    }
+    await group.save();
+
+    currentUser.group = null;
+    await currentUser.save();
+
+    res.send('User left the group successfully');
 });
