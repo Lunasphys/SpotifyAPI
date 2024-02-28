@@ -1,1 +1,65 @@
 
+# Fichiers de configuration de l'environnement
+.env
+
+# Dossiers des dépendances
+node_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Répertoires et fichiers de runtime
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Répertoire de build
+/dist
+
+# Fichiers temporaires
+temp/
+
+# Fichiers de l'éditeur
+.idea/
+*.swp
+*.swo
+.vscode/
+
+# Fichiers de cache de dépendances
+.yarn-cache/
+.yarn/
+.yarn-integrity
+
+# Fichiers de build et de compilation
+/build/
+/coverage/
+
+# Fichiers MacOS
+.DS_Store
+
+# Fichiers archives (en cas de compression du projet)
+*.tar.gz
+*.zip
+*.rar
+
+# Fichiers de base de données locaux
+*.sqlite
+*.db
+
+# Certificats SSL (si utilisés localement pour le développement HTTPS)
+*.pem
+*.cert
+*.key
+
+# Fichiers spécifiques au déploiement
+/.env.production
+/deploy_scripts/
+
+# Fichiers Docker (si vous utilisez des identifiants ou des configurations spécifiques)
+docker-compose.yml
+Dockerfile
