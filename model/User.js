@@ -19,7 +19,6 @@ userSchema.statics.findOrCreate = async function findOrCreate(profile, cb) {
         if(!result){
             userObj.username = profile.displayName;
             userObj.spotifyId = profile.id;
-            // ajoutez ici toute autre information que vous souhaitez enregistrer
             await userObj.save();
             cb(null, userObj);
         }else{
