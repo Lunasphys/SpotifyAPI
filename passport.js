@@ -2,9 +2,10 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const SpotifyStrategy = require('passport-spotify').Strategy;
 const bcrypt = require('bcrypt');
-const { User } = require('.model/User');
+const { User } = require('./model/User');
 
 require('dotenv').config();
+
 
 passport.use(new LocalStrategy(
     function(username, password, done) {
@@ -31,12 +32,7 @@ passport.use(new SpotifyStrategy({
         });
     }
 ));
-app.get('/auth/spotify/callback',
-    passport.authenticate('spotify', { failureRedirect: '/login' }),
-    function(req, res) {
-        // Successful authentication, redirect home.
-        res.redirect('/');
-    });
+
 passport.serializeUser(function(user, done) {
     done(null, user.id);
 });

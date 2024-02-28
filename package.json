@@ -16,6 +16,9 @@
     "express-session": "^1.18.0",
     "mongoose": "^8.1.2",
     "passport": "^0.7.0",
-    "passport-spotify": "^2.0.0"
+    "passport-local": "^1.0.0",
+    "passport-spotify": "^2.0.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0"
   }
 }
