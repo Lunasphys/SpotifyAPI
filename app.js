@@ -9,6 +9,7 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger');
 const SpotifyWebApi = require('spotify-web-api-node');
 const app = express();
+const cors = require('cors');
 const spotifyApi = new SpotifyWebApi({
     clientId: process.env.SPOTIFY_CLIENT_ID,
     clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
@@ -24,11 +25,19 @@ app.use(session({
 }));
 
 require('./passport');
+app.use(cors({
+    origin: 'http://localhost:3000'
+}));
+app.use(function(req, res, next) {
+    res.setHeader("Content-Security-Policy", "default-src 'none'; connect-src 'self'; script-src 'self'; font-src 'self' http://localhost:3000; style-src 'self' http://fonts.googleapis.com;");
+    return next();
+});
 
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.json());
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.use(router);
 
 // Routes
 app.get('/', (req, res) => {
@@ -41,28 +50,34 @@ require('dotenv').config();
 // registration
 router.post('/register', async (req, res) => {
     const { username, password } = req.body;
-// Check if the username and password are provided
+    console.log('Received request to register user:', username);
+
+    // Check if the username and password are provided
     if (!username || !password) {
+        console.log('Username or password not provided');
         return res.status(400).send('Username and password are required');
     }
 
     // if user already exists
     const existingUser = await User.findOne({ username });
     if (existingUser) {
+        console.log('User already exists:', username);
         return res.status(400).send('User already exists');
     }
 
     // password hash
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log('Password hashed successfully');
 
     // new user
     const user = new User({ username, password: hashedPassword });
     await user.save();
+    console.log('User saved successfully:', username);
 
     res.send('User registered successfully');
 });
 
-app.use(router);
+
 
 app.get('/auth/spotify', passport.authenticate('spotify', {
     scope: ['user-read-email', 'user-read-private'],
@@ -115,42 +130,6 @@ app.get('/auth/spotify/callback',
         res.redirect('/');
     });
 
-/**
- * @swagger
- * components:
- *   schemas:
- *     User:
- *       type: object
- *       required:
- *         - username
- *         - password
- *       properties:
- *         username:
- *           type: string
- *         password:
- *           type: string
- *
- */
-
-/**
- * @swagger
- * /register:
- *   post:
- *     summary: Register a new user
- *     consumes:
- *       - application/json
- *     parameters:
- *       - in: body
- *         name: user
- *         description: The user to create.
- *         schema:
- *           $ref: '#/components/schemas/User'
- *     responses:
- *       200:
- *         description: User registered successfully
- *       400:
- *         description: Username is already taken or username and password are required
- */
 
 app.post('/login', (req, res, next) => {
     passport.authenticate('local', (err, user, info) => {
@@ -259,3 +238,217 @@ router.post('/leaveGroup', async (req, res) => {
     res.send('User left the group successfully');
 });
 
+// Synchronization
+router.post('/syncPlayback', async (req, res) => {
+    const currentUser = req.user;
+
+    if (!currentUser.group || !currentUser.group.chief.equals(currentUser._id)) {
+        return res.status(400).send('User is not the chief of a group');
+    }
+
+    spotifyApi.setAccessToken(currentUser.accessToken);
+
+    const playback = await spotifyApi.getMyCurrentPlaybackState();
+    const trackUri = playback.body.item.uri;
+    const positionMs = playback.body.progress_ms;
+
+    const group = await Group.findById(currentUser.group).populate('users');
+    for (const user of group.users) {
+        if (!user.equals(currentUser)) {
+            spotifyApi.setAccessToken(user.accessToken);
+            await spotifyApi.play({ uris: [trackUri], position_ms: positionMs });
+        }
+    }
+
+    res.send('Playback synchronized successfully');
+});
+
+// Playlist
+router.post('/createPlaylist', async (req, res) => {
+    const currentUser = req.user;
+    const { targetUser } = req.body;
+
+    const target = await User.findById(targetUser);
+    if (!target || !target.group.equals(currentUser.group)) {
+        return res.status(400).send('Target user is not in the same group');
+    }
+
+    spotifyApi.setAccessToken(target.accessToken);
+
+    const topTracks = await spotifyApi.getMyTopTracks({ limit: 10 });
+    const trackUris = topTracks.body.items.map(track => track.uri);
+
+    spotifyApi.setAccessToken(currentUser.accessToken);
+
+    const playlist = await spotifyApi.createPlaylist(currentUser.spotifyId, 'Top 10 Tracks', { public: false });
+    await spotifyApi.addTracksToPlaylist(playlist.body.id, trackUris);
+
+    res.send('Playlist created successfully');
+});
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - username
+ *         - password
+ *       properties:
+ *         username:
+ *           type: string
+ *         password:
+ *           type: string
+ *
+ */
+
+/**
+ * @swagger
+ * /register:
+ *   post:
+ *     summary: Register a new user
+ *     consumes:
+ *       - application/json
+ *     parameters:
+ *       - in: body
+ *         name: user
+ *         description: The user to create.
+ *         schema:
+ *           $ref: '#/components/schemas/User'
+ *     responses:
+ *       200:
+ *         description: User registered successfully
+ *       400:
+ *         description: Username is already taken or username and password are required
+ */
+
+/**
+ * @swagger
+ * /login:
+ *   post:
+ *     summary: Log in a user
+ *     consumes:
+ *       - application/json
+ *     parameters:
+ *       - in: body
+ *         name: user
+ *         description: The user to log in.
+ *         schema:
+ *           type: object
+ *           required:
+ *             - username
+ *             - password
+ *           properties:
+ *             username:
+ *               type: string
+ *             password:
+ *               type: string
+ *     responses:
+ *       200:
+ *         description: User logged in
+ *       400:
+ *         description: Invalid login data
+ */
+
+/**
+ * @swagger
+ * /joinGroup:
+ *   post:
+ *     summary: Join a group
+ *     consumes:
+ *       - application/json
+ *     parameters:
+ *       - in: body
+ *         name: group
+ *         description: The group to join.
+ *         schema:
+ *           type: object
+ *           required:
+ *             - groupName
+ *           properties:
+ *             groupName:
+ *               type: string
+ *     responses:
+ *       200:
+ *         description: User joined the group successfully
+ *       400:
+ *         description: Group name is required
+ */
+
+/**
+ * @swagger
+ * /groups:
+ *   get:
+ *     summary: Fetch all groups
+ *     responses:
+ *       200:
+ *         description: List of all groups
+ */
+
+/**
+ * @swagger
+ * /groupUsers/{groupId}:
+ *   get:
+ *     summary: Fetch all users in a specific group
+ *     parameters:
+ *       - in: path
+ *         name: groupId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: List of all users in the group
+ *       404:
+ *         description: Group not found
+ */
+
+/**
+ * @swagger
+ * /leaveGroup:
+ *   post:
+ *     summary: Leave a group
+ *     responses:
+ *       200:
+ *         description: User left the group successfully
+ *       400:
+ *         description: User is not in a group
+ */
+
+/**
+ * @swagger
+ * /syncPlayback:
+ *   post:
+ *     summary: Synchronize playback
+ *     responses:
+ *       200:
+ *         description: Playback synchronized successfully
+ *       400:
+ *         description: User is not the chief of a group
+ */
+
+/**
+ * @swagger
+ * /createPlaylist:
+ *   post:
+ *     summary: Create a playlist
+ *     consumes:
+ *       - application/json
+ *     parameters:
+ *       - in: body
+ *         name: targetUser
+ *         description: The target user to create a playlist for.
+ *         schema:
+ *           type: object
+ *           required:
+ *             - targetUser
+ *           properties:
+ *             targetUser:
+ *               type: string
+ *     responses:
+ *       200:
+ *         description: Playlist created successfully
+ *       400:
+ *         description: Target user is not in the same group
+ */
