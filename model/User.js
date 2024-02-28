@@ -12,6 +12,24 @@ const userSchema = new Schema({
     group: { type: Schema.Types.ObjectId, ref: 'Group' }
 });
 
+userSchema.statics.findOrCreate = async function findOrCreate(profile, cb) {
+    var userObj = new this();
+    try {
+        let result = await this.findOne({spotifyId : profile.id});
+        if(!result){
+            userObj.username = profile.displayName;
+            userObj.spotifyId = profile.id;
+            // ajoutez ici toute autre information que vous souhaitez enregistrer
+            await userObj.save();
+            cb(null, userObj);
+        }else{
+            cb(null, result);
+        }
+    } catch(err) {
+        cb(err, null);
+    }
+};
+
 const groupSchema = new Schema({
     name: String,
     users: [{ type: Schema.Types.ObjectId, ref: 'User' }],

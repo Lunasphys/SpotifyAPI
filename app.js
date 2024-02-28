@@ -6,7 +6,8 @@ const bcrypt = require('bcrypt');
 const session = require('express-session');
 const swaggerUi = require('swagger-ui-express');
 const swaggerDocument = require('./swagger');
-module.exports = { User, Group };
+mongoose.connect('mongodb://localhost:27017/SpotyAPI', { useNewUrlParser: true, useUnifiedTopology: true });
+
 
 const app = express();
 
@@ -54,10 +55,16 @@ app.use(function(req, res, next) {
     res.setHeader("Content-Security-Policy", "default-src 'none'; font-src 'self' http://localhost:3000; style-src 'self' http://fonts.googleapis.com;");
     return next();
 });
+
+app.get('/auth/spotify', passport.authenticate('spotify', {
+    scope: ['user-read-email', 'user-read-private'],
+    showDialog: true
+}));
+
 app.get('/auth/spotify/callback',
     passport.authenticate('spotify', { failureRedirect: '/login' }),
     function(req, res) {
-        // Successful authentication, redirect home.
+        // Redirection
         res.redirect('/');
     });
 
