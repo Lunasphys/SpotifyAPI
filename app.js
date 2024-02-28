@@ -167,3 +167,68 @@ app.post('/login', (req, res, next) => {
         });
     })(req, res, next);
 });
+
+// Join a group
+
+router.post('/joinGroup', async (req, res) => {
+    const { groupName } = req.body;
+    const currentUser = req.user;
+
+    if (!groupName) {
+        return res.status(400).send('Group name is required');
+    }
+
+    let group = await Group.findOne({ name: groupName });
+
+    if (!group) {
+        group = new Group({ name: groupName, chief: currentUser._id });
+    } else {
+        if (currentUser.group) {
+            const oldGroup = await Group.findById(currentUser.group);
+            oldGroup.users.pull(currentUser._id);
+            if (oldGroup.chief.equals(currentUser._id)) {
+                if (oldGroup.users.length > 0) {
+                    oldGroup.chief = oldGroup.users[0];
+                } else {
+                    await Group.findByIdAndDelete(oldGroup._id);
+                }
+            }
+            await oldGroup.save();
+        }
+        group.users.push(currentUser._id);
+    }
+
+    currentUser.group = group._id;
+    await currentUser.save();
+    await group.save();
+
+    res.send('User joined the group successfully');
+});
+
+// Consult group
+// Fetch all groups
+router.get('/groups', async (req, res) => {
+    const groups = await Group.find().populate('users', 'username');
+    const groupsInfo = groups.map(group => ({
+        groupName: group.name,
+        numberOfUsers: group.users.length
+    }));
+    res.json(groupsInfo);
+});
+
+// Fetch all users in a specific group
+router.get('/groupUsers/:groupId', async (req, res) => {
+    const { groupId } = req.params;
+    const group = await Group.findById(groupId).populate('users', 'username');
+    if (!group) {
+        return res.status(404).send('Group not found');
+    }
+    const usersInfo = group.users.map(user => ({
+        username: user.username,
+        isChief: user._id.equals(group.chief),
+        spotifyUsername: user.profile ? user.profile.username : null,
+        currentTrack: user.profile ? user.profile.currentTrack : null,
+        activeDeviceName: user.profile ? user.profile.activeDeviceName : null
+    }));
+    res.json(usersInfo);
+});

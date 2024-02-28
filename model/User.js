@@ -4,11 +4,19 @@ const { Schema } = mongoose;
 mongoose.connect('mongodb://localhost:27017/SpotyAPI');
 const userSchema = new Schema({
     spotifyId: String,
-    username: String,
-    password: String,
+    username: { type: String, unique: true, required: true },
+    password: { type: String, required: true },
     accessToken: String,
     refreshToken: String,
-    profile: Object,
+    profile: {
+        username: String,
+        currentTrack: {
+            title: String,
+            artist: String,
+            album: String
+        },
+        activeDeviceName: String
+    },
     group: { type: Schema.Types.ObjectId, ref: 'Group' }
 });
 
@@ -30,7 +38,7 @@ userSchema.statics.findOrCreate = async function findOrCreate(profile, cb) {
 };
 
 const groupSchema = new Schema({
-    name: String,
+    name: { type: String, unique: true, required: true },
     users: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     chief: { type: Schema.Types.ObjectId, ref: 'User' }
 });
