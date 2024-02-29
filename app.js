@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const router = express.Router();
 const passport = require('passport');
-const { User, Group } = require('./model/User');
+const {User, Group} = require('./model/User');
 const bcrypt = require('bcrypt');
 const session = require('express-session');
 const swaggerUi = require('swagger-ui-express');
@@ -16,7 +16,7 @@ const spotifyApi = new SpotifyWebApi({
     redirectUri: 'http://localhost:3000/auth/spotify/callback'
 });
 
-mongoose.connect('mongodb://localhost:27017/SpotyAPI', { useNewUrlParser: true, useUnifiedTopology: true });
+mongoose.connect('mongodb://localhost:27017/SpotyAPI', {useNewUrlParser: true, useUnifiedTopology: true});
 
 app.use(session({
     secret: 'secret',
@@ -28,7 +28,7 @@ require('./passport');
 app.use(cors({
     origin: 'http://localhost:3000'
 }));
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
     res.setHeader("Content-Security-Policy", "default-src 'none'; connect-src 'self'; script-src 'self'; font-src 'self' http://localhost:3000; style-src 'self' http://fonts.googleapis.com;");
     return next();
 });
@@ -49,7 +49,7 @@ require('dotenv').config();
 
 // registration
 router.post('/register', async (req, res) => {
-    const { username, password } = req.body;
+    const {username, password} = req.body;
     console.log('Received request to register user:', username);
 
     // Check if the username and password are provided
@@ -59,7 +59,7 @@ router.post('/register', async (req, res) => {
     }
 
     // if user already exists
-    const existingUser = await User.findOne({ username });
+    const existingUser = await User.findOne({username});
     if (existingUser) {
         console.log('User already exists:', username);
         return res.status(400).send('User already exists');
@@ -70,13 +70,44 @@ router.post('/register', async (req, res) => {
     console.log('Password hashed successfully');
 
     // new user
-    const user = new User({ username, password: hashedPassword });
-    await user.save();
-    console.log('User saved successfully:', username);
+    const createUser = async (username, password, spotifyId) => {
+        try {
+            // Vérifier si l'utilisateur existe déjà
+            const existingUser = await User.findOne({username: username});
+            if (existingUser) {
+                throw new Error('Username already exists');
+            }
 
-    res.send('User registered successfully');
+            // Hacher le mot de passe
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // Créer un nouvel utilisateur
+            const newUser = new User({
+                username: username,
+                password: hashedPassword,
+                spotifyId: spotifyId
+            });
+
+            // Enregistrer le nouvel utilisateur
+            await newUser.save();
+            return newUser;
+        } catch (error) {
+            throw new Error('Error creating user: ' + error.message);
+        }
+    };
 });
 
+app.post('/register', async (req, res) => {
+    try {
+        const {username, password, spotifyId} = req.body;
+        const newUser = await createUser(username, password, spotifyId);
+        console.log('User saved successfully:', username);
+        res.status(201).send('User registered successfully');
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).send('Error registering user');
+    }
+});
 
 
 app.get('/auth/spotify', passport.authenticate('spotify', {
@@ -85,8 +116,8 @@ app.get('/auth/spotify', passport.authenticate('spotify', {
 }));
 
 app.get('/auth/spotify/callback',
-    passport.authenticate('spotify', { failureRedirect: '/login' }),
-    function(req, res) {
+    passport.authenticate('spotify', {failureRedirect: '/login'}),
+    function (req, res) {
         res.redirect('/');
     });
 
@@ -98,7 +129,7 @@ app.post('/login', (req, res, next) => {
         if (!user) {
             return res.status(400).send('Invalid login data: ' + info.message);
         }
-        req.logIn(user, function(err) {
+        req.logIn(user, function (err) {
             if (err) {
                 return res.status(500).send('An error occurred: ' + err);
             }
@@ -114,7 +145,7 @@ app.listen(3000, () => {
 });
 
 module.exports = router;
-app.use(function(req, res, next) {
+app.use(function (req, res, next) {
     res.setHeader("Content-Security-Policy", "default-src 'none'; font-src 'self' http://localhost:3000; style-src 'self' http://fonts.googleapis.com;");
     return next();
 });
@@ -125,8 +156,8 @@ app.get('/auth/spotify', passport.authenticate('spotify', {
 }));
 
 app.get('/auth/spotify/callback',
-    passport.authenticate('spotify', { failureRedirect: '/login' }),
-    function(req, res) {
+    passport.authenticate('spotify', {failureRedirect: '/login'}),
+    function (req, res) {
         res.redirect('/');
     });
 
@@ -139,7 +170,7 @@ app.post('/login', (req, res, next) => {
         if (!user) {
             return res.status(400).send('Invalid login data: ' + info.message);
         }
-        req.logIn(user, function(err) {
+        req.logIn(user, function (err) {
             if (err) {
                 return res.status(500).send('An error occurred: ' + err);
             }
@@ -151,17 +182,17 @@ app.post('/login', (req, res, next) => {
 // Join a group
 
 router.post('/joinGroup', async (req, res) => {
-    const { groupName } = req.body;
+    const {groupName} = req.body;
     const currentUser = req.user;
 
     if (!groupName) {
         return res.status(400).send('Group name is required');
     }
 
-    let group = await Group.findOne({ name: groupName });
+    let group = await Group.findOne({name: groupName});
 
     if (!group) {
-        group = new Group({ name: groupName, chief: currentUser._id });
+        group = new Group({name: groupName, chief: currentUser._id});
     } else {
         if (currentUser.group) {
             const oldGroup = await Group.findById(currentUser.group);
@@ -198,7 +229,7 @@ router.get('/groups', async (req, res) => {
 
 // Fetch all users in a specific group
 router.get('/groupUsers/:groupId', async (req, res) => {
-    const { groupId } = req.params;
+    const {groupId} = req.params;
     const group = await Group.findById(groupId).populate('users', 'username');
     if (!group) {
         return res.status(404).send('Group not found');
@@ -256,7 +287,7 @@ router.post('/syncPlayback', async (req, res) => {
     for (const user of group.users) {
         if (!user.equals(currentUser)) {
             spotifyApi.setAccessToken(user.accessToken);
-            await spotifyApi.play({ uris: [trackUri], position_ms: positionMs });
+            await spotifyApi.play({uris: [trackUri], position_ms: positionMs});
         }
     }
 
@@ -266,7 +297,7 @@ router.post('/syncPlayback', async (req, res) => {
 // Playlist
 router.post('/createPlaylist', async (req, res) => {
     const currentUser = req.user;
-    const { targetUser } = req.body;
+    const {targetUser} = req.body;
 
     const target = await User.findById(targetUser);
     if (!target || !target.group.equals(currentUser.group)) {
@@ -275,15 +306,49 @@ router.post('/createPlaylist', async (req, res) => {
 
     spotifyApi.setAccessToken(target.accessToken);
 
-    const topTracks = await spotifyApi.getMyTopTracks({ limit: 10 });
+    const topTracks = await spotifyApi.getMyTopTracks({limit: 10});
     const trackUris = topTracks.body.items.map(track => track.uri);
 
     spotifyApi.setAccessToken(currentUser.accessToken);
 
-    const playlist = await spotifyApi.createPlaylist(currentUser.spotifyId, 'Top 10 Tracks', { public: false });
+    const playlist = await spotifyApi.createPlaylist(currentUser.spotifyId, 'Top 10 Tracks', {public: false});
     await spotifyApi.addTracksToPlaylist(playlist.body.id, trackUris);
 
     res.send('Playlist created successfully');
+});
+
+// Analyse des Titres Likés d'un utilisateur pour déduire sa personnalité
+app.get('/user/personality', async (req, res) => {
+    try {
+        const userId = req.query.userId; // Supposons que l'ID de l'utilisateur soit passé en paramètre de requête
+
+        // Récupérer les Titres Likés de l'utilisateur à partir de la base de données
+        const likedTracks = await LikedTrack.find({ userId: userId });
+
+        if (likedTracks.length === 0) {
+            res.status(404).send('Aucun titre liké trouvé pour cet utilisateur');
+            return;
+        }
+
+        // Analyser les Titres Likés pour déduire la personnalité de l'utilisateur
+        const danceAttraction = calculateDanceAttraction(likedTracks);
+        const averageTempo = calculateAverageTempo(likedTracks);
+        const vocalPreference = calculateVocalPreference(likedTracks);
+        const mood = calculateMood(likedTracks);
+
+        // Générer le portrait de personnalité de l'utilisateur
+        const userPersonality = {
+            danceAttraction: danceAttraction,
+            averageTempo: averageTempo,
+            vocalPreference: vocalPreference,
+            mood: mood
+        };
+
+        res.status(200).json(userPersonality);
+    } catch (error) {
+        console.error('Erreur lors de la récupération de la personnalité de l\'utilisateur:', error);
+        res.status(500).send('Erreur lors de la récupération de la personnalité de l\'utilisateur');
+    }
 });
 
 /**
